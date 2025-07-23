@@ -56,12 +56,12 @@ def index_page(url, html_content):
     print(f"Found {len(words)} words, indexed {indexed_word_count} useful words from {url}")
 
 if __name__ == "__main__":
-    start_url = "https://toscrape.com/"
+    start_url = "https://www.ndtv.com/"
     
     urls_to_visit = [start_url]
     visited_urls = set()
     
-    max_pages = 10
+    max_pages = 100
     pages_crawled = 0
 
     while urls_to_visit and pages_crawled < max_pages:
