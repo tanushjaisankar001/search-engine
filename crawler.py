@@ -3,15 +3,17 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import json
 import re
+import math
 
 STOP_WORDS = set([
     'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 
     'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 
     'were', 'will', 'with', 'i', 'you', 'your', 'we', 'us', 'our', 'css', 
-    'js', 'html', 'http', 'https'
+    'js', 'html', 'http', 'https', 'com', 'org', 'net', 'www'
 ])
 
 inverted_index = {}
+document_store = {}
 
 def fetch_page_content(url):
     try:
@@ -26,37 +28,44 @@ def fetch_page_content(url):
 
 def parse_links(url, html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-    links = []
+    links = set()
     for a_tag in soup.find_all('a', href=True):
         href = a_tag['href']
         link = urljoin(url, href)
         parsed_link = urlparse(link)
         clean_link = parsed_link._replace(fragment="").geturl()
-        links.append(clean_link)
-    return links
+        links.add(clean_link)
+    return list(links)
 
-def index_page(url, html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
+def index_page(url, html):
+    global inverted_index, document_store
+    
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    title = soup.title.string.strip() if soup.title else url.split('/')[-2] or url.split('/')[-1]
     
     text = soup.get_text()
+    words = re.findall(r'\w+', text.lower())
     
-    words = re.findall(r'\b[a-z0-9]{2,}\b', text.lower())
-    
-    indexed_word_count = 0
-    for word in words:
-        if word in STOP_WORDS:
-            continue
+    if not words:
+        return
 
-        if word not in inverted_index:
-            inverted_index[word] = []
-        if url not in inverted_index[word]:
-            inverted_index[word].append(url)
-        indexed_word_count += 1
+    document_store[url] = {'title': title, 'length': len(words)}
     
-    print(f"Found {len(words)} words, indexed {indexed_word_count} useful words from {url}")
+    term_frequencies = {}
+    for word in words:
+        if word not in STOP_WORDS:
+            term_frequencies[word] = term_frequencies.get(word, 0) + 1
+
+    for word, count in term_frequencies.items():
+        if word not in inverted_index:
+            inverted_index[word] = {}
+        inverted_index[word][url] = count
+
+    print(f"Indexed {len(term_frequencies)} unique words from {url}")
 
 if __name__ == "__main__":
-    start_url = "https://www.ndtv.com/"
+    start_url = "https://wallhaven.cc/"
     
     urls_to_visit = [start_url]
     visited_urls = set()
@@ -71,13 +80,13 @@ if __name__ == "__main__":
             continue
             
         visited_urls.add(current_url)
-        pages_crawled += 1
         
-        print(f"\nCrawling ({pages_crawled}/{max_pages}): {current_url}")
+        print(f"\nCrawling ({pages_crawled + 1}/{max_pages}): {current_url}")
         
         html = fetch_page_content(current_url)
         
         if html:
+            pages_crawled += 1
             index_page(current_url, html)
             
             found_links = parse_links(current_url, html)
@@ -87,11 +96,23 @@ if __name__ == "__main__":
                 if link.startswith(start_url) and link not in visited_urls and link not in urls_to_visit:
                     urls_to_visit.append(link)
 
-    print("\n--- Crawling Complete ---")
-    
-    index_file_path = 'index.json'
-    print(f"Saving index to {index_file_path}...")
-    with open(index_file_path, 'w') as f:
-        json.dump(inverted_index, f, indent=2)
-        
-    print("Done!")
+    print("\n--- Crawl Complete ---")
+    print(f"Crawled {pages_crawled} pages.")
+    print(f"Indexed {len(inverted_index)} unique words.")
+
+    num_documents = len(document_store)
+    idf_scores = {}
+    for word, postings in inverted_index.items():
+        doc_frequency = len(postings)
+        idf_scores[word] = math.log(num_documents / (1 + doc_frequency))
+
+    final_index = {
+        'inverted_index': inverted_index,
+        'idf_scores': idf_scores,
+        'document_store': document_store
+    }
+
+    with open("index.json", "w", encoding='utf-8') as f:
+        json.dump(final_index, f, indent=2)
+
+    print("\nInverted index with TF and IDF data saved to index.json")
