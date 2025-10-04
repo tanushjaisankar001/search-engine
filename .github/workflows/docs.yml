@@ -17,9 +17,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Generate & Deploy Docs
-        uses: jadenisaac2005/ai-docs-action@v1 # This calls the action
-        with:
+      - name: AI Documentation Generator
+        uses: jadenisaac2005/ai-docs-action@v1.0.0        with:
           api_key: ${{ secrets.AI_API_KEY }}
           api_endpoint: ${{ secrets.AI_API_ENDPOINT }}
           model_name: 'Salesforce/codet5-small' # Specify the model your endpoint uses
