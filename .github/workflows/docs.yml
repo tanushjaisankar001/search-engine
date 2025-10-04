@@ -1,7 +1,6 @@
 # .github/workflows/docs.yml
 
 name: Generate AI Documentation
-uses: jadenisaac2005/ai-docs-action@v1.0.0
 
 on:
   push:
